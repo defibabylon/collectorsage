@@ -1,0 +1,29 @@
+# Collectorsage
+
+Collectorsage is a comprehensive web application designed to analyze comic book prices. It leverages various APIs and services to fetch and process data, providing users with detailed reports on comic book values.
+
+## Table of Contents
+
+- [Getting Started](#getting-started)
+- [Project Structure](#project-structure)
+- [Available Scripts](#available-scripts)
+- [Environment Variables](#environment-variables)
+- [Endpoints](#endpoints)
+- [Technologies Used](#technologies-used)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Getting Started
+
+### Prerequisites
+
+Ensure you have the following installed:
+
+- Node.js
+- npm or yarn
+- Python
+- pip
+
+### Installation
+
+1. Clone the repository:
