@@ -40,9 +40,25 @@ try:
     # Initialize the Anthropic client with the API key
     client = anthropic.Client(api_key=anthropic_api_key)
 
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'D:/projects/2024/q3/collectorsage/collectorsage.json'
+    google_credentials = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+    if google_credentials and os.path.exists(google_credentials):
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = google_credentials
+    else:
+        # For cloud deployment, we'll use JSON content from environment variable
+        google_creds_json = os.getenv('GOOGLE_CREDENTIALS_JSON')
+        if google_creds_json:
+            # Create a temporary credentials file
+            import tempfile
+            import json
+            
+            temp_creds = tempfile.NamedTemporaryFile(delete=False)
+            with open(temp_creds.name, 'w') as f:
+                f.write(google_creds_json)
+            
+            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = temp_creds.name
 
-    cache = redis.Redis(host='localhost', port=6379, db=0)
+    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+    cache = redis.from_url(redis_url)
 
     CLIENT_ID = os.getenv('CLIENT_ID')
     CLIENT_SECRET = os.getenv('CLIENT_SECRET')
@@ -56,7 +72,7 @@ def root():
     return "Hello, World!"
 
 @app.get("/test")
-async def test_endpoint():
+def test_endpoint():
     return {"message": "Test endpoint is working"}
 
 @app.route('/process_image', methods=['POST'])
@@ -159,6 +175,7 @@ def list_routes():
 
 if __name__ == '__main__':
     try:
-        app.run(host='0.0.0.0', port=5000, debug=True)
+        port = int(os.environ.get('PORT', 5000))
+        app.run(host='0.0.0.0', port=port, debug=False)
     except Exception as e:
         logging.exception("Error starting Flask app")
