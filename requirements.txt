@@ -4,6 +4,6 @@ requests==2.26.0
 Pillow==8.3.1
 tqdm==4.61.2
 redis==3.5.3
-anthropic==0.1.0  # Ensure this matches the correct version for your API
+anthropic==0.5.0  # Ensure this matches the correct version for your API
 google-cloud==0.34.0  # Or the specific Google Cloud libraries you are using
 python-dotenv==0.19.0
