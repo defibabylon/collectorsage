@@ -12,7 +12,15 @@ CLIENT_ID = os.getenv('CLIENT_ID')
 CLIENT_SECRET = os.getenv('CLIENT_SECRET')
 REDIRECT_URI = os.getenv('REDIRECT_URI', 'http://localhost:8000/callback')
 
-cache = redis.Redis(host='localhost', port=6379, db=0)
+redis_url = os.getenv('REDIS_URL')
+if redis_url and redis_url.strip():
+    try:
+        cache = redis.from_url(redis_url)
+    except Exception as e:
+        logging.warning(f"Failed to connect to Redis in eBay module: {e}")
+        cache = None
+else:
+    cache = None
 
 def get_ebay_oauth_token():
     logging.info("Fetching eBay OAuth token...")
@@ -26,7 +34,8 @@ def get_ebay_oauth_token():
         response = requests.post(token_url, headers=headers, data=data, auth=(CLIENT_ID, CLIENT_SECRET))
         response.raise_for_status()
         token = response.json().get('access_token')
-        cache.set('EBAY_OAUTH_TOKEN', token, ex=3600)
+        if cache:
+            cache.set('EBAY_OAUTH_TOKEN', token, ex=3600)
         return token
     except requests.exceptions.RequestException as e:
         logging.exception(f"Error fetching eBay OAuth token: {e}")
@@ -35,7 +44,9 @@ def get_ebay_oauth_token():
 def fetch_ebay_data(query):
     logging.info(f"Fetching eBay data for query: {query}")
     try:
-        token = cache.get('EBAY_OAUTH_TOKEN')
+        token = None
+        if cache:
+            token = cache.get('EBAY_OAUTH_TOKEN')
         if not token:
             token = get_ebay_oauth_token()
         if not token:
@@ -59,7 +70,8 @@ def fetch_ebay_data(query):
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
         data = response.json()
-        cache.set(query, json.dumps(data), ex=3600)
+        if cache:
+            cache.set(query, json.dumps(data), ex=3600)
         return data
     except requests.exceptions.RequestException as e:
         logging.exception(f"Error fetching eBay data for query: {query} - {e}")

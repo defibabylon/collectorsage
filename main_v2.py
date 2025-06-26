@@ -57,8 +57,17 @@ try:
             
             os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = temp_creds.name
 
-    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-    cache = redis.from_url(redis_url)
+    redis_url = os.getenv('REDIS_URL')
+    if redis_url and redis_url.strip():
+        try:
+            cache = redis.from_url(redis_url)
+            logging.info("Redis cache connected successfully")
+        except Exception as e:
+            logging.warning(f"Failed to connect to Redis: {e}. Continuing without cache.")
+            cache = None
+    else:
+        logging.info("No Redis URL provided. Running without cache.")
+        cache = None
 
     CLIENT_ID = os.getenv('CLIENT_ID')
     CLIENT_SECRET = os.getenv('CLIENT_SECRET')
