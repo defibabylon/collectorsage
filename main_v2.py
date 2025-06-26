@@ -100,6 +100,32 @@ def debug_endpoint():
     }
     return jsonify(debug_info)
 
+@app.get("/test-vision")
+def test_vision_endpoint():
+    """Test endpoint to check if Google Vision client can be initialized"""
+    try:
+        from utils.image_processing import vision_client
+        if vision_client:
+            return jsonify({'status': 'success', 'message': 'Google Vision client initialized successfully'})
+        else:
+            return jsonify({'status': 'error', 'message': 'Google Vision client not available'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'Error initializing Google Vision client: {str(e)}'})
+
+@app.get("/test-anthropic")
+def test_anthropic_endpoint():
+    """Test endpoint to check if Anthropic client can be initialized"""
+    try:
+        import anthropic
+        anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
+        if anthropic_api_key:
+            client = anthropic.Client(api_key=anthropic_api_key)
+            return jsonify({'status': 'success', 'message': 'Anthropic client initialized successfully'})
+        else:
+            return jsonify({'status': 'error', 'message': 'ANTHROPIC_API_KEY not set'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'Error initializing Anthropic client: {str(e)}'})
+
 @app.route('/process_image', methods=['POST'])
 def process_image():
     if 'image' not in request.files:
@@ -175,16 +201,27 @@ def process_image():
             }
             return jsonify({'comicDetails': comic_details, 'report': qualitative_report})
         else:
-            return jsonify({'error': 'Failed to process image'}), 500
+            logging.error("Failed to process image - no result returned from process_comic_image")
+            return jsonify({'error': 'Failed to process image. This could be due to Google Vision API issues or the image not containing recognizable comic book text.'}), 500
 
-    except FileNotFoundError:
+    except FileNotFoundError as e:
+        logging.error(f"Image file not found: {e}")
         return jsonify({'error': 'Image file not found'}), 404
     except ValueError as e:
+        logging.error(f"ValueError in image processing: {e}")
         return jsonify({'error': str(e)}), 400
     except Exception as e:
         logging.exception("Error processing image")
         error_message = f"An unexpected error occurred: {str(e)}"
         logging.error(f"Detailed error: {error_message}")
+
+        # Check if it's a Google Vision API error
+        if "google" in str(e).lower() or "vision" in str(e).lower():
+            error_message = "Google Vision API error. Please check your Google Cloud credentials configuration."
+        # Check if it's an Anthropic API error
+        elif "anthropic" in str(e).lower() or "claude" in str(e).lower():
+            error_message = "Anthropic Claude API error. Please check your API key configuration."
+
         return jsonify({'error': error_message}), 500
     
 # Route to list all routes
