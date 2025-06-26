@@ -216,6 +216,112 @@ def test_image_processing():
             'error_type': type(e).__name__
         }), 500
 
+@app.route('/test-simple-processing', methods=['GET'])
+def test_simple_processing():
+    """Test endpoint to check basic image processing components"""
+    try:
+        # Test 1: Import check
+        logging.info("Testing imports...")
+        from utils.image_processing import vision_client, get_google_credentials
+        from PIL import Image
+        import io
+        import base64
+
+        # Test 2: Create a simple test image
+        logging.info("Creating test image...")
+        test_image = Image.new('RGB', (100, 100), color='white')
+        img_buffer = io.BytesIO()
+        test_image.save(img_buffer, format='JPEG')
+        img_buffer.seek(0)
+
+        # Test 3: Save test image to upload folder
+        test_image_path = os.path.join(app.config['UPLOAD_FOLDER'], 'test_image.jpg')
+        with open(test_image_path, 'wb') as f:
+            f.write(img_buffer.getvalue())
+        logging.info(f"Test image saved to: {test_image_path}")
+
+        # Test 4: Try to process the test image
+        logging.info("Testing image processing...")
+        result, search_query = process_comic_image(test_image_path)
+
+        # Clean up
+        if os.path.exists(test_image_path):
+            os.remove(test_image_path)
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Simple image processing test completed',
+            'result': result,
+            'search_query': search_query,
+            'vision_client_available': vision_client is not None
+        })
+
+    except Exception as e:
+        logging.exception("Error in simple image processing test")
+        import traceback
+        return jsonify({
+            'status': 'error',
+            'message': f'Error in simple processing test: {str(e)}',
+            'error_type': type(e).__name__,
+            'traceback': traceback.format_exc()
+        }), 500
+
+@app.route('/debug-image-processing', methods=['GET'])
+def debug_image_processing():
+    """Debug endpoint to test each step of image processing"""
+    try:
+        # Check if there are any existing images in the uploads folder
+        upload_folder = app.config['UPLOAD_FOLDER']
+        if os.path.exists(upload_folder):
+            image_files = [f for f in os.listdir(upload_folder) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]
+            if image_files:
+                # Use the first available image
+                test_image_path = os.path.join(upload_folder, image_files[0])
+                logging.info(f"Debug testing image processing with: {test_image_path}")
+
+                # Test Google Vision step by step
+                from utils.image_processing import recognize_comic_issue_with_google_vision, get_comic_details_with_claude
+
+                # Step 1: Test Google Vision
+                recognized_text = recognize_comic_issue_with_google_vision(test_image_path)
+
+                # Step 2: Test Claude if we have text
+                comic_details = None
+                if recognized_text:
+                    comic_details = get_comic_details_with_claude(test_image_path)
+
+                return jsonify({
+                    'status': 'success',
+                    'test_image': image_files[0],
+                    'step1_google_vision': {
+                        'text_recognized': bool(recognized_text),
+                        'text_length': len(recognized_text) if recognized_text else 0,
+                        'text_preview': recognized_text[:200] if recognized_text else None
+                    },
+                    'step2_claude_api': {
+                        'details_extracted': bool(comic_details),
+                        'details': comic_details
+                    }
+                })
+            else:
+                return jsonify({
+                    'status': 'info',
+                    'message': 'No test images available in upload folder'
+                })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Upload folder does not exist'
+            })
+
+    except Exception as e:
+        logging.exception("Error in debug image processing")
+        return jsonify({
+            'status': 'error',
+            'message': f'Error in debug image processing: {str(e)}',
+            'error_type': type(e).__name__
+        }), 500
+
 @app.route('/process_image', methods=['POST'])
 def process_image():
     if 'image' not in request.files:
