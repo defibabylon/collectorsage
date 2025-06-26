@@ -2,30 +2,73 @@ import anthropic
 import base64
 import os
 import re
+import json
 from google.cloud import vision
 from google.oauth2 import service_account
 from PIL import Image
 import io
 
 # Initialize Google Vision client
-credentials_path = "D:\\projects\\2024\\Q3\\collectorsage\\collectorsage-eec946bf70cd.json"
-credentials = service_account.Credentials.from_service_account_file(credentials_path)
-vision_client = vision.ImageAnnotatorClient(credentials=credentials)
+def get_google_credentials():
+    """Get Google Cloud credentials from environment variables or file."""
+    # First, try to use GOOGLE_APPLICATION_CREDENTIALS if it's set
+    if os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
+        return None  # Let the client use default credentials
+
+    # If not, try to use GOOGLE_CREDENTIALS_JSON environment variable
+    google_creds_json = os.getenv('GOOGLE_CREDENTIALS_JSON')
+    if google_creds_json:
+        # Parse the JSON and create credentials from it
+        try:
+            creds_info = json.loads(google_creds_json)
+            credentials = service_account.Credentials.from_service_account_info(creds_info)
+            return credentials
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"Error parsing GOOGLE_CREDENTIALS_JSON: {e}")
+            return None
+
+    # Fallback to local file if running locally
+    local_credentials_path = "D:\\projects\\2024\\Q3\\collectorsage\\collectorsage-eec946bf70cd.json"
+    if os.path.exists(local_credentials_path):
+        return service_account.Credentials.from_service_account_file(local_credentials_path)
+
+    print("No Google Cloud credentials found. Please set GOOGLE_CREDENTIALS_JSON environment variable.")
+    return None
+
+# Get credentials and initialize client
+credentials = get_google_credentials()
+if credentials:
+    vision_client = vision.ImageAnnotatorClient(credentials=credentials)
+else:
+    # Try to initialize with default credentials (for cloud environments)
+    try:
+        vision_client = vision.ImageAnnotatorClient()
+    except Exception as e:
+        print(f"Failed to initialize Google Vision client: {e}")
+        vision_client = None
 
 def recognize_comic_issue_with_google_vision(image_path):
-    with open(image_path, 'rb') as image_file:
-        content = image_file.read()
+    if not vision_client:
+        print("Google Vision client not available. Skipping text recognition.")
+        return None
 
-    image = vision.Image(content=content)
-    response = vision_client.text_detection(image=image)
-    texts = response.text_annotations
+    try:
+        with open(image_path, 'rb') as image_file:
+            content = image_file.read()
 
-    if texts:
-        recognized_text = texts[0].description
-        print(f"Recognized text: {recognized_text}")
-        return recognized_text
-    else:
-        print("No text recognized.")
+        image = vision.Image(content=content)
+        response = vision_client.text_detection(image=image)
+        texts = response.text_annotations
+
+        if texts:
+            recognized_text = texts[0].description
+            print(f"Recognized text: {recognized_text}")
+            return recognized_text
+        else:
+            print("No text recognized.")
+            return None
+    except Exception as e:
+        print(f"Error during Google Vision text recognition: {e}")
         return None
 
 def convert_image_to_jpg(image_path):
