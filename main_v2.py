@@ -75,6 +75,22 @@ def root():
 def test_endpoint():
     return {"message": "Test endpoint is working"}
 
+@app.get("/debug")
+def debug_endpoint():
+    """Debug endpoint to check environment variables and credentials"""
+    debug_info = {
+        "anthropic_key_set": bool(os.getenv('ANTHROPIC_API_KEY')),
+        "google_creds_json_set": bool(os.getenv('GOOGLE_CREDENTIALS_JSON')),
+        "google_app_creds_set": bool(os.getenv('GOOGLE_APPLICATION_CREDENTIALS')),
+        "upload_folder": app.config.get('UPLOAD_FOLDER'),
+        "upload_folder_exists": os.path.exists(app.config.get('UPLOAD_FOLDER', '')),
+        "ebay_client_id_set": bool(os.getenv('CLIENT_ID')),
+        "ebay_client_secret_set": bool(os.getenv('CLIENT_SECRET')),
+        "pinecone_api_key_set": bool(os.getenv('PINECONE_API_KEY')),
+        "redis_url": os.getenv('REDIS_URL', 'Not set')
+    }
+    return jsonify(debug_info)
+
 @app.route('/process_image', methods=['POST'])
 def process_image():
     if 'image' not in request.files:
