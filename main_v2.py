@@ -176,6 +176,46 @@ def test_process_image():
             'error_type': type(e).__name__
         }), 500
 
+@app.route('/test-image-processing', methods=['GET'])
+def test_image_processing():
+    """Test endpoint to check image processing with a sample image"""
+    try:
+        # Check if there are any existing images in the uploads folder
+        upload_folder = app.config['UPLOAD_FOLDER']
+        if os.path.exists(upload_folder):
+            image_files = [f for f in os.listdir(upload_folder) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]
+            if image_files:
+                # Use the first available image
+                test_image_path = os.path.join(upload_folder, image_files[0])
+                logging.info(f"Testing image processing with: {test_image_path}")
+
+                result, search_query = process_comic_image(test_image_path)
+
+                return jsonify({
+                    'status': 'success',
+                    'message': f'Image processing test completed with {image_files[0]}',
+                    'result': result,
+                    'search_query': search_query
+                })
+            else:
+                return jsonify({
+                    'status': 'info',
+                    'message': 'No test images available in upload folder'
+                })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Upload folder does not exist'
+            })
+
+    except Exception as e:
+        logging.exception("Error in test image processing")
+        return jsonify({
+            'status': 'error',
+            'message': f'Error in test image processing: {str(e)}',
+            'error_type': type(e).__name__
+        }), 500
+
 @app.route('/process_image', methods=['POST'])
 def process_image():
     if 'image' not in request.files:
