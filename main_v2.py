@@ -105,7 +105,9 @@ def process_image():
     image.save(image_path)
 
     try:
+        logging.info(f"Processing image: {image_path}")
         result, search_query = process_comic_image(image_path)
+        logging.info(f"Image processing result: {result}, search_query: {search_query}")
 
         if result:
             title = result['title']
@@ -172,7 +174,9 @@ def process_image():
         return jsonify({'error': str(e)}), 400
     except Exception as e:
         logging.exception("Error processing image")
-        return jsonify({'error': 'An unexpected error occurred'}), 500
+        error_message = f"An unexpected error occurred: {str(e)}"
+        logging.error(f"Detailed error: {error_message}")
+        return jsonify({'error': error_message}), 500
     
 # Route to list all routes
 @app.get("/routes")

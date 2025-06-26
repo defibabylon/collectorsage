@@ -20,11 +20,23 @@ def get_google_credentials():
     if google_creds_json:
         # Parse the JSON and create credentials from it
         try:
+            # Try to handle common formatting issues
+            google_creds_json = google_creds_json.strip()
+
+            # If the JSON is wrapped in quotes, remove them
+            if google_creds_json.startswith('"') and google_creds_json.endswith('"'):
+                google_creds_json = google_creds_json[1:-1]
+
+            # Replace escaped quotes
+            google_creds_json = google_creds_json.replace('\\"', '"')
+
             creds_info = json.loads(google_creds_json)
             credentials = service_account.Credentials.from_service_account_info(creds_info)
+            print("Successfully loaded Google Cloud credentials from environment variable")
             return credentials
         except (json.JSONDecodeError, ValueError) as e:
             print(f"Error parsing GOOGLE_CREDENTIALS_JSON: {e}")
+            print(f"First 100 characters of credentials: {google_creds_json[:100]}...")
             return None
 
     # Fallback to local file if running locally
