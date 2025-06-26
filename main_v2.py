@@ -126,6 +126,56 @@ def test_anthropic_endpoint():
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'Error initializing Anthropic client: {str(e)}'})
 
+@app.route('/test-process', methods=['POST'])
+def test_process_image():
+    """Test endpoint to simulate image processing without actual image"""
+    try:
+        # Test the image processing pipeline with mock data
+        logging.info("Testing image processing pipeline...")
+
+        # Mock comic details
+        mock_result = {
+            'title': 'Test Comic',
+            'issue_number': '1',
+            'year': '2023'
+        }
+        mock_search_query = 'Test Comic 1 2023'
+
+        logging.info(f"Mock processing result: {mock_result}, search_query: {mock_search_query}")
+
+        title = mock_result['title']
+        issue_number = mock_result['issue_number']
+        year = mock_result['year']
+
+        # Test database fetch
+        from utils.database import fetch_database_info
+        database_prices, metadata = fetch_database_info(title, issue_number)
+        logging.info(f"Database fetch successful: {len(database_prices)} prices, {len(metadata) if metadata else 0} metadata")
+
+        # Test eBay fetch
+        from utils.ebay import fetch_ebay_data
+        ebay_data = fetch_ebay_data(mock_search_query)
+        logging.info(f"eBay fetch successful: {len(ebay_data.get('itemSummaries', []))} items")
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Image processing pipeline test completed successfully',
+            'mock_data': {
+                'comic_details': mock_result,
+                'database_prices_count': len(database_prices),
+                'metadata_count': len(metadata) if metadata else 0,
+                'ebay_items_count': len(ebay_data.get('itemSummaries', []))
+            }
+        })
+
+    except Exception as e:
+        logging.exception("Error in test image processing pipeline")
+        return jsonify({
+            'status': 'error',
+            'message': f'Error in test processing: {str(e)}',
+            'error_type': type(e).__name__
+        }), 500
+
 @app.route('/process_image', methods=['POST'])
 def process_image():
     if 'image' not in request.files:
@@ -141,6 +191,17 @@ def process_image():
 
     try:
         logging.info(f"Processing image: {image_path}")
+        logging.info(f"Image file size: {os.path.getsize(image_path)} bytes")
+
+        # Test if we can read the image file
+        try:
+            with open(image_path, 'rb') as f:
+                content = f.read(100)  # Read first 100 bytes
+            logging.info(f"Successfully read image file, first 10 bytes: {content[:10]}")
+        except Exception as e:
+            logging.error(f"Failed to read image file: {e}")
+            return jsonify({'error': f'Failed to read uploaded image: {str(e)}'}), 500
+
         result, search_query = process_comic_image(image_path)
         logging.info(f"Image processing result: {result}, search_query: {search_query}")
 
