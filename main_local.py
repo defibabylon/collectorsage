@@ -121,10 +121,18 @@ def process_image():
                 avg_price = sum(prices) / len(prices)
                 sales_trend = calculate_sales_trend(items)
 
+                # Try to get year from metadata if not found in image
+                display_year = year
+                if (not year or year == 'N/A') and metadata and isinstance(metadata, list) and metadata:
+                    meta_year = metadata[0].get('year')
+                    if meta_year:
+                        display_year = str(meta_year)
+                        logging.info(f"Using year from metadata: {display_year}")
+
                 comic_details = {
                     'title': title,
-                    'issue_number': issue_number,
-                    'year': year,
+                    'issueNumber': issue_number,  # Fixed: camelCase for frontend
+                    'year': display_year,
                     'min_price': f"{min_price:.2f}",
                     'max_price': f"{max_price:.2f}",
                     'avg_price': f"{avg_price:.2f}",
@@ -140,7 +148,7 @@ def process_image():
                 database_avg_price = sum(database_prices) / len(database_prices) if database_prices else 0.0
 
                 qualitative_report = generate_qualitative_report(
-                    title, issue_number, year, avg_price, database_avg_price,
+                    title, issue_number, display_year, avg_price, database_avg_price,
                     ebay_data, client, sales_trend, metadata
                 )
 
@@ -230,10 +238,18 @@ def process_image_fast():
                 avg_price = sum(prices) / len(prices)
                 sales_trend = calculate_sales_trend(items)
 
+                # Try to get year from metadata if not found in image
+                display_year = year
+                if (not year or year == 'N/A') and metadata and isinstance(metadata, list) and metadata:
+                    meta_year = metadata[0].get('year')
+                    if meta_year:
+                        display_year = str(meta_year)
+                        logging.info(f"Using year from metadata: {display_year}")
+
                 comic_details = {
                     'title': title,
-                    'issue_number': issue_number,
-                    'year': year,
+                    'issueNumber': issue_number,  # Fixed: camelCase for frontend
+                    'year': display_year,
                     'min_price': f"{min_price:.2f}",
                     'max_price': f"{max_price:.2f}",
                     'avg_price': f"{avg_price:.2f}",
@@ -249,7 +265,7 @@ def process_image_fast():
                 database_avg_price = sum(database_prices) / len(database_prices) if database_prices else 0.0
 
                 qualitative_report = generate_qualitative_report(
-                    title, issue_number, year, avg_price, database_avg_price,
+                    title, issue_number, display_year, avg_price, database_avg_price,
                     ebay_data, client, sales_trend, metadata
                 )
 

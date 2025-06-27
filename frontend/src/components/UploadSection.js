@@ -1,17 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://collectorsage-backend.onrender.com';
 
-function UploadSection({ setComicDetails, setReport }) {
+function UploadSection({ setComicDetails, setReport, setUploadedImage }) {
   const [image, setImage] = useState(null);
   const [status, setStatus] = useState('');
   const [processingInfo, setProcessingInfo] = useState(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef(null);
 
-  const handleImageUpload = (e) => {
-    setImage(e.target.files[0]);
+  const handleImageUpload = (file) => {
+    setImage(file);
     setStatus('');
     setProcessingInfo(null);
+
+    // Create a URL for the uploaded image and pass it to parent
+    if (setUploadedImage) {
+      const imageUrl = URL.createObjectURL(file);
+      setUploadedImage(imageUrl);
+    }
+  };
+
+  const handleFileInputChange = (e) => {
+    if (e.target.files[0]) {
+      handleImageUpload(e.target.files[0]);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const files = e.dataTransfer.files;
+    if (files[0] && files[0].type.startsWith('image/')) {
+      handleImageUpload(files[0]);
+    }
+  };
+
+  const handleZoneClick = () => {
+    fileInputRef.current?.click();
   };
 
   const processImage = async () => {
@@ -67,25 +104,46 @@ function UploadSection({ setComicDetails, setReport }) {
 
   return (
     <div className="upload-section">
-      <h2>Upload Comic Book Image</h2>
-      <input type="file" onChange={handleImageUpload} accept="image/*" />
-      <button onClick={processImage}>Process Image</button>
+      <div
+        className={`upload-zone ${isDragOver ? 'dragover' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={handleZoneClick}
+      >
+        <div className="upload-icon">🖼️</div>
+        <div className="upload-text">
+          {image ? image.name : 'Drop your comic image here'}
+        </div>
+        <div className="upload-subtext">
+          {image ? 'Click to change image' : 'or click to browse'}
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          onChange={handleFileInputChange}
+          accept="image/*"
+        />
+      </div>
+
+      <button
+        className="analyze-button"
+        onClick={processImage}
+        disabled={!image}
+      >
+        ANALYZE
+      </button>
+
       {status && <p className="status-message">{status}</p>}
 
       {processingInfo && (
-        <div className="processing-info" style={{
-          marginTop: '10px',
-          padding: '10px',
-          backgroundColor: '#f0f8ff',
-          borderRadius: '5px',
-          fontSize: '14px'
-        }}>
+        <div className="processing-info">
           <div><strong>Processing Method:</strong> {processingInfo.method === 'fast' ? '⚡ Fast (Claude Only)' : '🔍 Regular (Google Vision + Claude)'}</div>
           <div><strong>Total Time:</strong> {processingInfo.time}</div>
           {processingInfo.breakdown && (
-            <div style={{ marginTop: '5px' }}>
+            <div style={{ marginTop: '8px' }}>
               <strong>Breakdown:</strong>
-              <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
+              <ul>
                 {processingInfo.breakdown.image_processing && <li>Image Processing: {processingInfo.breakdown.image_processing}</li>}
                 {processingInfo.breakdown.database_fetch && <li>Database Fetch: {processingInfo.breakdown.database_fetch}</li>}
                 {processingInfo.breakdown.ebay_fetch && <li>eBay Fetch: {processingInfo.breakdown.ebay_fetch}</li>}

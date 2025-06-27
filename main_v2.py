@@ -402,15 +402,23 @@ def process_image_fast():
                     database_avg_price = 0.0
 
                 # Generate report
+                # Try to get year from metadata if not found in image
+                display_year = year
+                if (not year or year == 'N/A') and metadata and isinstance(metadata, list) and metadata:
+                    meta_year = metadata[0].get('year')
+                    if meta_year:
+                        display_year = str(meta_year)
+                        logging.info(f"Using year from metadata: {display_year}")
+
                 qualitative_report = generate_qualitative_report(
-                    title, issue_number, year, avg_price, database_avg_price,
+                    title, issue_number, display_year, avg_price, database_avg_price,
                     ebay_data, client, sales_trend, metadata
                 )
 
                 comic_details = {
                     'title': title,
                     'issueNumber': issue_number,
-                    'year': year
+                    'year': display_year
                 }
 
                 total_time = time.time() - start_time
@@ -553,15 +561,23 @@ def process_image():
             sold_dates = [datetime.strptime(item['itemEndDate'], '%Y-%m-%dT%H:%M:%S.%fZ') for item in items if 'itemEndDate' in item]
             sales_trend = calculate_sales_trend(sold_dates)
 
+            # Try to get year from metadata if not found in image
+            display_year = year
+            if (not year or year == 'N/A') and metadata and isinstance(metadata, list) and metadata:
+                meta_year = metadata[0].get('year')
+                if meta_year:
+                    display_year = str(meta_year)
+                    logging.info(f"Using year from metadata: {display_year}")
+
             qualitative_report = generate_qualitative_report(
-                title, issue_number, year, avg_price, database_avg_price,
+                title, issue_number, display_year, avg_price, database_avg_price,
                 ebay_data, client, sales_trend, metadata
             )
 
             comic_details = {
                 'title': title,
                 'issueNumber': issue_number,
-                'year': year
+                'year': display_year
             }
 
             total_time = time.time() - start_time

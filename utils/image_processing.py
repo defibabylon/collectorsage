@@ -255,12 +255,14 @@ def process_comic_image_fast(image_path):
         if not issue_number or issue_number.lower() in ['n/a', 'not specified', 'unknown']:
             issue_number = ''
 
-        # Extract year, if present
+        # Extract year, if present - be more flexible
         year = comic_details.get('year', '').strip()
-        if year and year.lower() != 'n/a':
-            year_match = re.search(r'\d{4}', year)
+        if year and year.lower() not in ['n/a', 'unknown', '']:
+            # Look for any 4-digit year in the response
+            year_match = re.search(r'(19|20)\d{2}', year)
             if year_match:
                 year = year_match.group()
+                print(f"Extracted year from Claude response: {year}")
             else:
                 year = ''
         else:
@@ -316,11 +318,16 @@ def process_comic_image_legacy(image_path):
             if not issue_number or 'not specified' in issue_number.lower():
                 issue_number = ''
 
-            # Extract year, if present
+            # Extract year, if present - be more flexible
             year = comic_details.get('year', '').strip()
-            year_match = re.search(r'\d{4}', year)
-            if year_match:
-                year = year_match.group()
+            if year and year.lower() not in ['n/a', 'unknown', '']:
+                # Look for any 4-digit year in the response
+                year_match = re.search(r'(19|20)\d{2}', year)
+                if year_match:
+                    year = year_match.group()
+                    print(f"Extracted year from Claude response: {year}")
+                else:
+                    year = ''
             else:
                 year = ''
 
