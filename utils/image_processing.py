@@ -7,6 +7,9 @@ from google.cloud import vision
 from google.oauth2 import service_account
 from PIL import Image
 import io
+import asyncio
+import concurrent.futures
+import time
 
 # Initialize Google Vision client
 def get_google_credentials():
@@ -68,7 +71,7 @@ def get_google_credentials():
             print(f"Error creating credentials from individual environment variables: {e}")
 
     # Fallback to local file if running locally
-    local_credentials_path = "D:\\projects\\2024\\Q3\\collectorsage\\collectorsage-eec946bf70cd.json"
+    local_credentials_path = "collectorsage.json"
     if os.path.exists(local_credentials_path):
         print("Using local credentials file for development")
         return service_account.Credentials.from_service_account_file(local_credentials_path)
@@ -76,19 +79,21 @@ def get_google_credentials():
     print("No Google Cloud credentials found. Please set GOOGLE_CREDENTIALS_JSON environment variable or individual credential environment variables.")
     return None
 
-# Get credentials and initialize client
-credentials = get_google_credentials()
-if credentials:
-    vision_client = vision.ImageAnnotatorClient(credentials=credentials)
-else:
-    # Try to initialize with default credentials (for cloud environments)
-    try:
-        vision_client = vision.ImageAnnotatorClient()
-    except Exception as e:
-        print(f"Failed to initialize Google Vision client: {e}")
-        vision_client = None
+def get_vision_client():
+    """Get Google Vision client with fresh credentials"""
+    credentials = get_google_credentials()
+    if credentials:
+        return vision.ImageAnnotatorClient(credentials=credentials)
+    else:
+        # Try to initialize with default credentials (for cloud environments)
+        try:
+            return vision.ImageAnnotatorClient()
+        except Exception as e:
+            print(f"Failed to initialize Google Vision client: {e}")
+            return None
 
 def recognize_comic_issue_with_google_vision(image_path):
+    vision_client = get_vision_client()
     if not vision_client:
         print("Google Vision client not available. Skipping text recognition.")
         print("This could be due to missing Google Cloud credentials.")
@@ -124,32 +129,46 @@ def recognize_comic_issue_with_google_vision(image_path):
         print(f"Full traceback: {traceback.format_exc()}")
         return None
 
-def convert_image_to_jpg(image_path):
+def convert_image_to_jpg(image_path, max_size=(1024, 1024), quality=85):
+    """Convert and optimize image for faster processing"""
     with open(image_path, 'rb') as image_file:
         image = Image.open(image_file)
-        image = image.convert('RGB')
+
+        # Convert to RGB if necessary
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+
+        # Resize if image is too large (speeds up API calls)
+        if image.size[0] > max_size[0] or image.size[1] > max_size[1]:
+            image.thumbnail(max_size, Image.Resampling.LANCZOS)
+            print(f"Resized image from original to {image.size} for faster processing")
+
         buffered = io.BytesIO()
-        image.save(buffered, format="JPEG")
+        image.save(buffered, format="JPEG", quality=quality, optimize=True)
         return buffered.getvalue()
 
-def get_comic_details_with_claude(image_path):
+def get_comic_details_with_claude_optimized(image_path):
+    """Optimized version that gets comic details faster with better prompting"""
     try:
-        print("Converting image to base64 for Claude API...")
-        base64_image = base64.b64encode(convert_image_to_jpg(image_path)).decode('utf-8')
-        print(f"Image converted to base64, length: {len(base64_image)}")
+        start_time = time.time()
+        print("Converting and optimizing image for Claude API...")
+
+        # Use optimized image conversion
+        base64_image = base64.b64encode(convert_image_to_jpg(image_path, max_size=(800, 800), quality=80)).decode('utf-8')
+        print(f"Optimized image converted to base64, length: {len(base64_image)}")
 
         anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
         if not anthropic_api_key:
             print("Error: ANTHROPIC_API_KEY environment variable not set")
             return None
 
-        print("Initializing Anthropic client...")
+        print("Calling Claude API for comic details extraction...")
         client = anthropic.Client(api_key=anthropic_api_key)
 
-        print("Calling Claude API for comic details extraction...")
+        # Optimized prompt for faster, more accurate extraction
         response = client.messages.create(
             model="claude-3-5-sonnet-20240620",
-            max_tokens=1024,
+            max_tokens=512,  # Reduced tokens for faster response
             messages=[
                 {
                     "role": "user",
@@ -165,18 +184,21 @@ def get_comic_details_with_claude(image_path):
                         {
                             "type": "text",
                             "text": (
-                                "Given the following image, provide the title, issue number, volume, and publication year of the comic book.\n\n"
-                                "Provide the information in the following format:\n"
-                                "Title: <Title>\n"
-                                "Issue Number: <Issue Number>\n"
-                                "Volume: <Volume>\n"
-                                "Year: <Year>"
+                                "Extract comic book information from this image. Look for the title, issue number, and year.\n\n"
+                                "Respond ONLY in this exact format:\n"
+                                "Title: [comic title]\n"
+                                "Issue Number: [number only, or 'N/A' if not visible]\n"
+                                "Year: [4-digit year, or 'N/A' if not visible]\n\n"
+                                "Be concise and accurate."
                             )
                         }
                     ]
                 }
             ]
         )
+
+        processing_time = time.time() - start_time
+        print(f"Claude API call completed in {processing_time:.2f} seconds")
 
         if response and response.content:
             text_blocks = [block.text for block in response.content if block.type == 'text']
@@ -194,6 +216,10 @@ def get_comic_details_with_claude(image_path):
         print(f"Full traceback: {traceback.format_exc()}")
         return None
 
+def get_comic_details_with_claude(image_path):
+    """Legacy version - keeping for compatibility"""
+    return get_comic_details_with_claude_optimized(image_path)
+
 def parse_comic_details(text):
     details = {}
     for line in text.split('\n'):
@@ -207,8 +233,71 @@ def parse_comic_details(text):
             details['year'] = line.replace("Year: ", "").strip()
     return details
 
+def process_comic_image_fast(image_path):
+    """Fast processing - skip Google Vision, go directly to Claude"""
+    print("Fast processing comic image...")
+    start_time = time.time()
+
+    # Skip Google Vision entirely and go straight to Claude
+    print("Getting comic details directly with Claude (skipping Google Vision)...")
+    comic_details = get_comic_details_with_claude_optimized(image_path)
+
+    if comic_details:
+        print(f"Comic details recognized: {comic_details}")
+
+        # Extract and clean up title
+        title = comic_details.get('title', '').strip()
+        if not title or title.lower() in ['n/a', 'unknown', '']:
+            title = "Unknown Title"
+
+        # Handle issue number
+        issue_number = comic_details.get('issue_number', '').strip()
+        if not issue_number or issue_number.lower() in ['n/a', 'not specified', 'unknown']:
+            issue_number = ''
+
+        # Extract year, if present
+        year = comic_details.get('year', '').strip()
+        if year and year.lower() != 'n/a':
+            year_match = re.search(r'\d{4}', year)
+            if year_match:
+                year = year_match.group()
+            else:
+                year = ''
+        else:
+            year = ''
+
+        # Prepare search query
+        search_terms = [title]
+        if issue_number:
+            search_terms.append(issue_number)
+        if year:
+            search_terms.append(year)
+
+        search_query = " ".join(search_terms).strip()
+
+        # Prepare comic details for return
+        cleaned_details = {
+            'title': title,
+            'issue_number': issue_number if issue_number else 'N/A',
+            'volume': comic_details.get('volume', 'N/A'),
+            'year': year if year else 'N/A'
+        }
+
+        processing_time = time.time() - start_time
+        print(f"Fast processing completed in {processing_time:.2f} seconds")
+        print(f"Search query: {search_query}")
+        return cleaned_details, search_query
+    else:
+        print("No comic details recognized.")
+        return None, None
+
 def process_comic_image(image_path):
-    print("Processing comic image...")
+    """Main processing function - now uses fast processing by default"""
+    return process_comic_image_fast(image_path)
+
+def process_comic_image_legacy(image_path):
+    """Legacy processing with Google Vision + Claude (slower but more thorough)"""
+    print("Processing comic image with legacy method...")
     recognized_text = recognize_comic_issue_with_google_vision(image_path)
 
     if recognized_text:
@@ -216,17 +305,17 @@ def process_comic_image(image_path):
         comic_details = get_comic_details_with_claude(image_path)
         if comic_details:
             print(f"Comic details recognized: {comic_details}")
-            
+
             # Extract and clean up title
             title = comic_details.get('title', '').strip()
             if not title:
                 title = "Unknown Title"
-            
+
             # Handle issue number
             issue_number = comic_details.get('issue_number', '').strip()
             if not issue_number or 'not specified' in issue_number.lower():
                 issue_number = ''
-            
+
             # Extract year, if present
             year = comic_details.get('year', '').strip()
             year_match = re.search(r'\d{4}', year)
@@ -234,16 +323,16 @@ def process_comic_image(image_path):
                 year = year_match.group()
             else:
                 year = ''
-            
+
             # Prepare search query
             search_terms = [title]
             if issue_number:
                 search_terms.append(issue_number)
             if year:
                 search_terms.append(year)
-            
+
             search_query = " ".join(search_terms).strip()
-            
+
             # Prepare comic details for return
             cleaned_details = {
                 'title': title,
@@ -251,7 +340,7 @@ def process_comic_image(image_path):
                 'volume': comic_details.get('volume', 'N/A'),
                 'year': year if year else 'N/A'
             }
-            
+
             print(f"Fetching eBay data for query: {search_query}")
             return cleaned_details, search_query
         else:

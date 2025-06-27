@@ -6,9 +6,12 @@ const API_URL = process.env.REACT_APP_API_URL || 'https://collectorsage-backend.
 function UploadSection({ setComicDetails, setReport }) {
   const [image, setImage] = useState(null);
   const [status, setStatus] = useState('');
+  const [processingInfo, setProcessingInfo] = useState(null);
 
   const handleImageUpload = (e) => {
     setImage(e.target.files[0]);
+    setStatus('');
+    setProcessingInfo(null);
   };
 
   const processImage = async () => {
@@ -32,7 +35,20 @@ function UploadSection({ setComicDetails, setReport }) {
       } else {
         setComicDetails(response.data.comicDetails);
         setReport(response.data.report);
-        setStatus('Processing complete');
+
+        // Store processing information
+        const processingMethod = response.data.processingMethod || 'unknown';
+        const processingTime = response.data.processingTime || 'N/A';
+        const breakdown = response.data.breakdown || {};
+
+        setProcessingInfo({
+          method: processingMethod,
+          time: processingTime,
+          breakdown: breakdown
+        });
+
+        const methodText = processingMethod === 'fast' ? '⚡ Fast Processing' : '🔍 Regular Processing';
+        setStatus(`✅ Processing complete using ${methodText} (${processingTime})`);
       }
     } catch (error) {
       setStatus('Error processing image');
@@ -55,6 +71,29 @@ function UploadSection({ setComicDetails, setReport }) {
       <input type="file" onChange={handleImageUpload} accept="image/*" />
       <button onClick={processImage}>Process Image</button>
       {status && <p className="status-message">{status}</p>}
+
+      {processingInfo && (
+        <div className="processing-info" style={{
+          marginTop: '10px',
+          padding: '10px',
+          backgroundColor: '#f0f8ff',
+          borderRadius: '5px',
+          fontSize: '14px'
+        }}>
+          <div><strong>Processing Method:</strong> {processingInfo.method === 'fast' ? '⚡ Fast (Claude Only)' : '🔍 Regular (Google Vision + Claude)'}</div>
+          <div><strong>Total Time:</strong> {processingInfo.time}</div>
+          {processingInfo.breakdown && (
+            <div style={{ marginTop: '5px' }}>
+              <strong>Breakdown:</strong>
+              <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
+                {processingInfo.breakdown.image_processing && <li>Image Processing: {processingInfo.breakdown.image_processing}</li>}
+                {processingInfo.breakdown.database_fetch && <li>Database Fetch: {processingInfo.breakdown.database_fetch}</li>}
+                {processingInfo.breakdown.ebay_fetch && <li>eBay Fetch: {processingInfo.breakdown.ebay_fetch}</li>}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

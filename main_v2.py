@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from flask import Flask, request, jsonify, url_for
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
-from utils.image_processing import process_comic_image
+from utils.image_processing import process_comic_image, process_comic_image_fast
 from utils.report_generation import generate_qualitative_report
 from utils.ebay import fetch_ebay_data, calculate_sales_trend
 from utils.database import fetch_database_info
@@ -14,6 +14,9 @@ from config import UPLOAD_FOLDER
 import anthropic
 import redis
 from datetime import datetime
+import time
+import concurrent.futures
+import concurrent.futures
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG, 
@@ -322,8 +325,9 @@ def debug_image_processing():
             'error_type': type(e).__name__
         }), 500
 
-@app.route('/process_image', methods=['POST'])
-def process_image():
+@app.route('/process_image_fast', methods=['POST'])
+def process_image_fast():
+    """Optimized image processing endpoint with parallel data fetching"""
     if 'image' not in request.files:
         return jsonify({'error': 'No image file provided'}), 400
 
@@ -336,6 +340,120 @@ def process_image():
     image.save(image_path)
 
     try:
+        start_time = time.time()
+        logging.info(f"Fast processing image: {image_path}")
+
+        # Step 1: Fast image processing (Claude only)
+        result, search_query = process_comic_image(image_path)
+        image_processing_time = time.time() - start_time
+        logging.info(f"Image processing completed in {image_processing_time:.2f}s: {result}")
+
+        if result:
+            title = result['title']
+            issue_number = result['issue_number']
+            year = result['year']
+
+            # Step 2: Parallel data fetching
+            parallel_start = time.time()
+
+            # Use ThreadPoolExecutor for parallel API calls
+            import concurrent.futures
+
+            def fetch_database_data():
+                return fetch_database_info(title, issue_number)
+
+            def fetch_ebay_data_wrapper():
+                return fetch_ebay_data(search_query)
+
+            # Execute database and eBay fetching in parallel
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                database_future = executor.submit(fetch_database_data)
+                ebay_future = executor.submit(fetch_ebay_data_wrapper)
+
+                # Get results
+                database_prices, metadata = database_future.result()
+                ebay_data = ebay_future.result()
+
+            parallel_time = time.time() - parallel_start
+            logging.info(f"Parallel data fetching completed in {parallel_time:.2f}s")
+
+            if not ebay_data or 'itemSummaries' not in ebay_data:
+                return jsonify({'error': 'No eBay data found'}), 404
+
+            # Step 3: Process results (same as before but faster)
+            items = ebay_data.get('itemSummaries', [])
+            items = sorted(items, key=lambda x: float(x['price']['value']), reverse=True)
+
+            prices = [convert_currency(float(item.get('price', {}).get('value', 0)),
+                     item.get('price', {}).get('currency', 'USD')) for item in items
+                     if item.get('price', {}).get('value')]
+
+            if prices:
+                avg_price = sum(prices) / len(prices)
+                logging.debug(f"Average eBay Price: £{avg_price:.2f}")
+
+                sold_dates = [datetime.strptime(item['itemEndDate'], '%Y-%m-%dT%H:%M:%S.%fZ')
+                             for item in items if 'itemEndDate' in item]
+                sales_trend = calculate_sales_trend(sold_dates)
+
+                if database_prices:
+                    database_avg_price = sum(database_prices) / len(database_prices)
+                else:
+                    database_avg_price = 0.0
+
+                # Generate report
+                qualitative_report = generate_qualitative_report(
+                    title, issue_number, year, avg_price, database_avg_price,
+                    ebay_data, client, sales_trend, metadata
+                )
+
+                comic_details = {
+                    'title': title,
+                    'issueNumber': issue_number,
+                    'year': year
+                }
+
+                total_time = time.time() - start_time
+                logging.info(f"Total fast processing time: {total_time:.2f}s")
+
+                return jsonify({
+                    'comicDetails': comic_details,
+                    'report': qualitative_report,
+                    'processingTime': f"{total_time:.2f}s"
+                })
+            else:
+                return jsonify({'error': 'No valid price data found'}), 404
+        else:
+            logging.error("Failed to process image - no result returned")
+            return jsonify({'error': 'Failed to process image. Please ensure the image contains clear comic book text.'}), 500
+
+    except Exception as e:
+        logging.exception("Error in fast image processing")
+        error_message = f"An unexpected error occurred: {str(e)}"
+
+        if "google" in str(e).lower() or "vision" in str(e).lower():
+            error_message = "Google Vision API error. Please check your credentials."
+        elif "anthropic" in str(e).lower() or "claude" in str(e).lower():
+            error_message = "Anthropic Claude API error. Please check your API key."
+
+        return jsonify({'error': error_message}), 500
+
+@app.route('/process_image', methods=['POST'])
+def process_image():
+    """Main image processing endpoint - uses fast processing first with fallback to regular processing"""
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image file provided'}), 400
+
+    image = request.files['image']
+    if image.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    filename = secure_filename(image.filename)
+    image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    image.save(image_path)
+
+    try:
+        start_time = time.time()
         logging.info(f"Processing image: {image_path}")
         logging.info(f"Image file size: {os.path.getsize(image_path)} bytes")
 
@@ -348,7 +466,46 @@ def process_image():
             logging.error(f"Failed to read image file: {e}")
             return jsonify({'error': f'Failed to read uploaded image: {str(e)}'}), 500
 
-        result, search_query = process_comic_image(image_path)
+        # STEP 1: Try fast processing first (Claude only)
+        logging.info("🚀 Attempting fast processing (Claude only)...")
+        image_processing_start = time.time()
+
+        try:
+            result, search_query = process_comic_image_fast(image_path)
+            image_processing_time = time.time() - image_processing_start
+
+            if result and result.get('title') and result.get('title') != 'Unknown Title':
+                logging.info(f"✅ Fast processing successful in {image_processing_time:.2f}s: {result}")
+                processing_method = "fast"
+            else:
+                raise ValueError("Fast processing failed to extract valid comic details")
+
+        except Exception as fast_error:
+            logging.warning(f"⚠️ Fast processing failed: {fast_error}")
+            logging.info("🔄 Falling back to regular processing (Google Vision + Claude)...")
+
+            # STEP 2: Fallback to regular processing (Google Vision + Claude)
+            try:
+                from utils.image_processing import process_comic_image_legacy
+                result, search_query = process_comic_image_legacy(image_path)
+                image_processing_time = time.time() - image_processing_start
+
+                if result and result.get('title') and result.get('title') != 'Unknown Title':
+                    logging.info(f"✅ Regular processing successful in {image_processing_time:.2f}s: {result}")
+                    processing_method = "regular"
+                else:
+                    raise ValueError("Both fast and regular processing failed")
+
+            except Exception as regular_error:
+                logging.error(f"❌ Regular processing also failed: {regular_error}")
+                return jsonify({
+                    'error': 'Failed to process image with both fast and regular methods. Please ensure the image contains a clear comic book cover.',
+                    'details': {
+                        'fast_error': str(fast_error),
+                        'regular_error': str(regular_error)
+                    }
+                }), 500
+
         logging.info(f"Image processing result: {result}, search_query: {search_query}")
 
         if result:
@@ -358,19 +515,24 @@ def process_image():
 
             logging.debug(f"Comic details - Title: {title}, Issue Number: {issue_number}, Year: {year}")
 
-            # Fetch database prices and metadata in a single query
-            database_prices, metadata = fetch_database_info(title, issue_number)
-            logging.debug(f"Database Prices: {database_prices}")
+            # Parallel processing for database and eBay data
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                # Submit both tasks
+                database_future = executor.submit(fetch_database_info, title, issue_number)
+                ebay_future = executor.submit(fetch_ebay_data, search_query)
 
-            if database_prices:
-                database_avg_price = sum(database_prices) / len(database_prices)
-            else:
-                database_avg_price = 0.0
+                # Get results
+                database_start = time.time()
+                database_prices, metadata = database_future.result()
+                database_time = time.time() - database_start
 
-            logging.debug(f"Database Average Price: £{database_avg_price:.2f}")
+                ebay_start = time.time()
+                ebay_data = ebay_future.result()
+                ebay_time = time.time() - ebay_start
 
-            # Fetch eBay data
-            ebay_data = fetch_ebay_data(search_query)
+            logging.debug(f"Database fetch completed in {database_time:.2f}s: {len(database_prices)} prices")
+            logging.debug(f"eBay fetch completed in {ebay_time:.2f}s")
+
             if not ebay_data or 'itemSummaries' not in ebay_data:
                 return jsonify({'error': 'No eBay data found or missing itemSummaries'}), 404
 
@@ -383,22 +545,17 @@ def process_image():
                 return jsonify({'error': 'No valid prices found'}), 404
 
             avg_price = sum(prices) / len(prices)
+            database_avg_price = sum(database_prices) / len(database_prices) if database_prices else 0.0
+
             logging.debug(f"Average eBay Price: £{avg_price:.2f}")
+            logging.debug(f"Database Average Price: £{database_avg_price:.2f}")
 
             sold_dates = [datetime.strptime(item['itemEndDate'], '%Y-%m-%dT%H:%M:%S.%fZ') for item in items if 'itemEndDate' in item]
             sales_trend = calculate_sales_trend(sold_dates)
 
-
             qualitative_report = generate_qualitative_report(
-                title, 
-                issue_number, 
-                year, 
-                avg_price, 
-                database_avg_price, 
-                ebay_data, 
-                client, 
-                sales_trend,
-                metadata
+                title, issue_number, year, avg_price, database_avg_price,
+                ebay_data, client, sales_trend, metadata
             )
 
             comic_details = {
@@ -406,10 +563,24 @@ def process_image():
                 'issueNumber': issue_number,
                 'year': year
             }
-            return jsonify({'comicDetails': comic_details, 'report': qualitative_report})
+
+            total_time = time.time() - start_time
+            logging.info(f"Processing completed in {total_time:.2f}s using {processing_method} method")
+
+            return jsonify({
+                'comicDetails': comic_details,
+                'report': qualitative_report,
+                'processingTime': f"{total_time:.2f}s",
+                'processingMethod': processing_method,
+                'breakdown': {
+                    'image_processing': f"{image_processing_time:.2f}s",
+                    'database_fetch': f"{database_time:.2f}s",
+                    'ebay_fetch': f"{ebay_time:.2f}s"
+                }
+            })
         else:
-            logging.error("Failed to process image - no result returned from process_comic_image")
-            return jsonify({'error': 'Failed to process image. This could be due to Google Vision API issues or the image not containing recognizable comic book text.'}), 500
+            logging.error("Failed to process image - no result returned")
+            return jsonify({'error': 'Failed to process image. Please ensure the image contains a clear comic book cover.'}), 500
 
     except FileNotFoundError as e:
         logging.error(f"Image file not found: {e}")

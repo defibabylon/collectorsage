@@ -77,30 +77,21 @@ def fetch_ebay_data(query):
         logging.exception(f"Error fetching eBay data for query: {query} - {e}")
         return {}
 
-def calculate_sales_trend(sold_dates):
-    if not sold_dates:
-        return "Stable"
-    
-    # Count the number of sales per month
-    sales_per_month = {}
-    for date in sold_dates:
-        month = date.strftime('%Y-%m')
-        if month in sales_per_month:
-            sales_per_month[month] += 1
-        else:
-            sales_per_month[month] = 1
-
-    if len(sales_per_month) < 2:
+def calculate_sales_trend(items):
+    """Calculate sales trend from eBay items"""
+    if not items:
         return "Stable"
 
-    # Sort the months and compare the counts
-    sorted_months = sorted(sales_per_month.items())
-    first_month_sales = sorted_months[0][1]
-    last_month_sales = sorted_months[-1][1]
+    # For now, return a simple trend based on number of items
+    # In a real implementation, we would extract actual sale dates
+    # from the eBay API response if available
 
-    if last_month_sales > first_month_sales:
-        return "Increasing"
-    elif last_month_sales < first_month_sales:
-        return "Decreasing"
+    num_items = len(items)
+    if num_items > 20:
+        return "High Activity"
+    elif num_items > 10:
+        return "Moderate Activity"
+    elif num_items > 5:
+        return "Low Activity"
     else:
-        return "Stable"
+        return "Limited Activity"
