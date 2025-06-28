@@ -418,7 +418,13 @@ def process_image_fast():
                 comic_details = {
                     'title': title,
                     'issueNumber': issue_number,
-                    'year': display_year
+                    'year': display_year,
+                    'min_price': f"{min_price:.2f}",
+                    'max_price': f"{max_price:.2f}",
+                    'avg_price': f"{avg_price:.2f}",
+                    'sales_trend': sales_trend,
+                    'database_avg_price': f"{database_avg_price:.2f}",
+                    'total_listings': len(items)
                 }
 
                 total_time = time.time() - start_time
@@ -577,7 +583,13 @@ def process_image():
             comic_details = {
                 'title': title,
                 'issueNumber': issue_number,
-                'year': display_year
+                'year': display_year,
+                'min_price': f"{min_price:.2f}",
+                'max_price': f"{max_price:.2f}",
+                'avg_price': f"{avg_price:.2f}",
+                'sales_trend': sales_trend,
+                'database_avg_price': f"{database_avg_price:.2f}",
+                'total_listings': len(items)
             }
 
             total_time = time.time() - start_time
