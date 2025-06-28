@@ -138,12 +138,7 @@ export default function HeroVillainLoading({ progress, className }: HeroVillainL
             }`} />
           </div>
           
-          {/* Hero label */}
-          <div className="absolute -bottom-4 sm:-bottom-6 left-1/2 transform -translate-x-1/2">
-            <span className="text-xs font-bold text-blue-300 bg-blue-900/50 px-2 py-1 rounded-full backdrop-blur-sm">
-              HERO
-            </span>
-          </div>
+
         </div>
       </div>
 
@@ -190,12 +185,7 @@ export default function HeroVillainLoading({ progress, className }: HeroVillainL
             }`} />
           </div>
           
-          {/* Villain label */}
-          <div className="absolute -bottom-4 sm:-bottom-6 left-1/2 transform -translate-x-1/2">
-            <span className="text-xs font-bold text-purple-300 bg-purple-900/50 px-2 py-1 rounded-full backdrop-blur-sm">
-              VILLAIN
-            </span>
-          </div>
+
         </div>
       </div>
 
