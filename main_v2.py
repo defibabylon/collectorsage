@@ -389,6 +389,8 @@ def process_image_fast():
                      if item.get('price', {}).get('value')]
 
             if prices:
+                min_price = min(prices)
+                max_price = max(prices)
                 avg_price = sum(prices) / len(prices)
                 logging.debug(f"Average eBay Price: £{avg_price:.2f}")
 
@@ -558,6 +560,8 @@ def process_image():
             if not prices:
                 return jsonify({'error': 'No valid prices found'}), 404
 
+            min_price = min(prices)
+            max_price = max(prices)
             avg_price = sum(prices) / len(prices)
             database_avg_price = sum(database_prices) / len(database_prices) if database_prices else 0.0
 
