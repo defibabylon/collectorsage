@@ -4,6 +4,7 @@ import React, { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
 import HeroVillainLoading from "./hero-villain-loading"
 import {
   Upload,
@@ -22,6 +23,10 @@ import {
   Target,
   Clock,
   Database,
+  Send,
+  CheckCircle,
+  AlertCircle,
+  MessageSquare,
 } from "lucide-react"
 import Image from "next/image"
 import axios from "axios"
@@ -53,13 +58,40 @@ interface ApiResponse {
   }
 }
 
+interface FeedbackData {
+  rating: number
+  comment: string
+  timestamp: string
+  processingMethod: string
+  analysisResults: ApiResponse
+  imageData?: string
+  sessionId?: string
+  userAgent?: string
+}
+
+interface FeedbackState {
+  rating: number
+  comment: string
+  isSubmitting: boolean
+  isSubmitted: boolean
+  submitError: string | null
+}
+
 export default function ComicValuationApp() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [uploadedFileData, setUploadedFileData] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [result, setResult] = useState<ApiResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [dragActive, setDragActive] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [feedback, setFeedback] = useState<FeedbackState>({
+    rating: 0,
+    comment: '',
+    isSubmitting: false,
+    isSubmitted: false,
+    submitError: null
+  })
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -98,6 +130,15 @@ export default function ComicValuationApp() {
     setIsAnalyzing(true)
     setProgress(0)
     setResult(null)
+
+    // Convert file to base64 for feedback storage
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        setUploadedFileData(e.target.result as string)
+      }
+    }
+    reader.readAsDataURL(file)
 
     try {
       const formData = new FormData()
@@ -140,10 +181,57 @@ export default function ComicValuationApp() {
 
   const resetApp = () => {
     setUploadedFile(null)
+    setUploadedFileData(null)
     setResult(null)
     setError(null)
     setProgress(0)
     setIsAnalyzing(false)
+    setFeedback({
+      rating: 0,
+      comment: '',
+      isSubmitting: false,
+      isSubmitted: false,
+      submitError: null
+    })
+  }
+
+  const submitFeedback = async () => {
+    if (!result || feedback.rating === 0) return
+
+    setFeedback(prev => ({ ...prev, isSubmitting: true, submitError: null }))
+
+    try {
+      const feedbackData: FeedbackData = {
+        rating: feedback.rating,
+        comment: feedback.comment,
+        timestamp: new Date().toISOString(),
+        processingMethod: 'fast', // We try fast first, could track which was actually used
+        analysisResults: result,
+        imageData: uploadedFileData, // Use the stored base64 data
+        sessionId: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        userAgent: navigator.userAgent
+      }
+
+      await axios.post(`${API_URL}/submit_feedback`, feedbackData, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      setFeedback(prev => ({
+        ...prev,
+        isSubmitting: false,
+        isSubmitted: true
+      }))
+
+    } catch (error) {
+      console.error('Error submitting feedback:', error)
+      setFeedback(prev => ({
+        ...prev,
+        isSubmitting: false,
+        submitError: 'Failed to submit feedback. Please try again.'
+      }))
+    }
   }
 
   return (
@@ -491,6 +579,94 @@ export default function ComicValuationApp() {
                     </p>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Feedback Section */}
+            <div className="mt-8">
+              <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl">
+                    <MessageSquare className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-white">Rate This Analysis</h3>
+                    <p className="text-gray-300/80">Help us improve our AI valuation accuracy</p>
+                  </div>
+                </div>
+
+                {!feedback.isSubmitted ? (
+                  <div className="space-y-6">
+                    {/* Star Rating */}
+                    <div>
+                      <label className="block text-white font-semibold mb-3">How accurate was this analysis?</label>
+                      <div className="flex gap-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            onClick={() => setFeedback(prev => ({ ...prev, rating: star }))}
+                            className={`p-2 rounded-xl transition-all duration-200 ${
+                              star <= feedback.rating
+                                ? 'text-yellow-400 bg-yellow-400/20 scale-110'
+                                : 'text-gray-400 hover:text-yellow-300 hover:bg-yellow-400/10'
+                            }`}
+                          >
+                            <Star className={`h-6 w-6 ${star <= feedback.rating ? 'fill-current' : ''}`} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Comment */}
+                    <div>
+                      <label className="block text-white font-semibold mb-3">Additional Comments (Optional)</label>
+                      <Textarea
+                        value={feedback.comment}
+                        onChange={(e) => setFeedback(prev => ({ ...prev, comment: e.target.value }))}
+                        placeholder="Tell us what you think about the analysis accuracy, pricing, or any other feedback..."
+                        className="bg-white/10 border-white/20 text-white placeholder-gray-400 rounded-xl resize-none"
+                        rows={3}
+                      />
+                    </div>
+
+                    {/* Submit Button */}
+                    <div className="flex items-center gap-4">
+                      <Button
+                        onClick={submitFeedback}
+                        disabled={feedback.rating === 0 || feedback.isSubmitting}
+                        className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {feedback.isSubmitting ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Submitting...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Submit Feedback
+                          </>
+                        )}
+                      </Button>
+
+                      {feedback.submitError && (
+                        <div className="flex items-center gap-2 text-red-400">
+                          <AlertCircle className="h-4 w-4" />
+                          <span className="text-sm">{feedback.submitError}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="flex items-center justify-center gap-3 mb-4">
+                      <CheckCircle className="h-8 w-8 text-green-400" />
+                      <h4 className="text-xl font-bold text-white">Thank You!</h4>
+                    </div>
+                    <p className="text-gray-300">Your feedback has been submitted successfully.</p>
+                    <p className="text-gray-400 text-sm mt-2">This helps us improve our AI analysis for everyone.</p>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -633,7 +633,63 @@ def process_image():
             error_message = "Anthropic Claude API error. Please check your API key configuration."
 
         return jsonify({'error': error_message}), 500
-    
+
+@app.route('/submit_feedback', methods=['POST'])
+def submit_feedback():
+    """Endpoint to receive and store user feedback about analysis results"""
+    try:
+        # Get JSON data from request
+        feedback_data = request.get_json()
+
+        if not feedback_data:
+            return jsonify({'error': 'No feedback data provided'}), 400
+
+        # Validate required fields
+        required_fields = ['rating', 'timestamp', 'analysisResults']
+        for field in required_fields:
+            if field not in feedback_data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+
+        # Validate rating is between 1-5
+        rating = feedback_data.get('rating')
+        if not isinstance(rating, int) or rating < 1 or rating > 5:
+            return jsonify({'error': 'Rating must be an integer between 1 and 5'}), 400
+
+        # Create feedback directory if it doesn't exist
+        feedback_dir = os.path.join(os.getcwd(), 'feedback')
+        os.makedirs(feedback_dir, exist_ok=True)
+
+        # Generate unique filename with timestamp
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+        filename = f"feedback_{timestamp}.json"
+        filepath = os.path.join(feedback_dir, filename)
+
+        # Add server-side metadata
+        feedback_data['server_timestamp'] = datetime.now().isoformat()
+        feedback_data['feedback_id'] = timestamp
+        feedback_data['environment'] = 'production'
+
+        # Save feedback to JSON file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(feedback_data, f, indent=2, ensure_ascii=False)
+
+        logging.info(f"Feedback saved successfully: {filename}")
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Feedback submitted successfully',
+            'feedback_id': timestamp,
+            'environment': 'production'
+        }), 200
+
+    except Exception as e:
+        logging.exception("Error saving feedback")
+        return jsonify({
+            'error': 'Failed to save feedback',
+            'message': str(e)
+        }), 500
+
 # Route to list all routes
 @app.get("/routes")
 def list_routes():
