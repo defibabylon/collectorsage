@@ -10,7 +10,7 @@ interface HeroVillainLoadingProps {
   className?: string
 }
 
-function HeroVillainLoading({ progress, className }: HeroVillainLoadingProps) {
+export default function HeroVillainLoading({ progress, className }: HeroVillainLoadingProps) {
   const [showImpact, setShowImpact] = useState(false)
   const [showFinalClash, setShowFinalClash] = useState(false)
   const [showFinalImpact, setShowFinalImpact] = useState(false)
@@ -22,26 +22,36 @@ function HeroVillainLoading({ progress, className }: HeroVillainLoadingProps) {
 
   // Check if mobile on mount and resize
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 640)
+    const checkMobile = () => {
+      if (typeof window !== 'undefined') {
+        setIsMobile(window.innerWidth < 640)
+      }
+    }
     checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', checkMobile)
+      return () => window.removeEventListener('resize', checkMobile)
+    }
   }, [])
 
   // Preload images on component mount
   useEffect(() => {
     const preloadImages = () => {
-      const heroImg = new Image()
-      const villainImg = new Image()
+      // Check if we're in the browser environment
+      if (typeof window !== 'undefined' && window.Image) {
+        const heroImg = new window.Image()
+        const villainImg = new window.Image()
 
-      heroImg.onload = () => setHeroImageLoaded(true)
-      villainImg.onload = () => setVillainImageLoaded(true)
+        heroImg.onload = () => setHeroImageLoaded(true)
+        villainImg.onload = () => setVillainImageLoaded(true)
 
-      heroImg.onerror = () => setHeroImageLoaded(false)
-      villainImg.onerror = () => setVillainImageLoaded(false)
+        heroImg.onerror = () => setHeroImageLoaded(false)
+        villainImg.onerror = () => setVillainImageLoaded(false)
 
-      heroImg.src = '/hero.png'
-      villainImg.src = '/villain.png'
+        heroImg.src = '/hero.png'
+        villainImg.src = '/villain.png'
+      }
 
       setImagesPreloaded(true)
     }
@@ -299,4 +309,4 @@ function HeroVillainLoading({ progress, className }: HeroVillainLoadingProps) {
   )
 }
 
-export default HeroVillainLoading
+
