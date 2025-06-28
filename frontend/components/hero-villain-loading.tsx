@@ -15,6 +15,8 @@ export default function HeroVillainLoading({ progress, className }: HeroVillainL
   const [showFinalImpact, setShowFinalImpact] = useState(false)
   const [heroImageLoaded, setHeroImageLoaded] = useState(false)
   const [villainImageLoaded, setVillainImageLoaded] = useState(false)
+  const [imageLoadAttempted, setImageLoadAttempted] = useState(false)
+  const [imagesPreloaded, setImagesPreloaded] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
 
   // Check if mobile on mount and resize
@@ -23,6 +25,27 @@ export default function HeroVillainLoading({ progress, className }: HeroVillainL
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // Preload images on component mount
+  useEffect(() => {
+    const preloadImages = () => {
+      const heroImg = new Image()
+      const villainImg = new Image()
+
+      heroImg.onload = () => setHeroImageLoaded(true)
+      villainImg.onload = () => setVillainImageLoaded(true)
+
+      heroImg.onerror = () => setHeroImageLoaded(false)
+      villainImg.onerror = () => setVillainImageLoaded(false)
+
+      heroImg.src = '/hero.png'
+      villainImg.src = '/villain.png'
+
+      setImagesPreloaded(true)
+    }
+
+    preloadImages()
   }, [])
 
   // Trigger impact flash when characters are close (around 95-100% progress)

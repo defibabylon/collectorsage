@@ -385,7 +385,7 @@ export default function ComicValuationApp() {
                         <div className="flex justify-between items-center gap-2">
                           <span className="text-gray-200 font-semibold text-sm sm:text-base">Min Price</span>
                           <span className="text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-pink-500 truncate">
-                            £{result.comicDetails.min_price}
+                            £{result.comicDetails.min_price || 'N/A'}
                           </span>
                         </div>
                         <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-pink-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -394,7 +394,7 @@ export default function ComicValuationApp() {
                         <div className="flex justify-between items-center gap-2">
                           <span className="text-gray-200 font-semibold text-sm sm:text-base">Max Price</span>
                           <span className="text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500 truncate">
-                            £{result.comicDetails.max_price}
+                            £{result.comicDetails.max_price || 'N/A'}
                           </span>
                         </div>
                         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-teal-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -405,7 +405,7 @@ export default function ComicValuationApp() {
                         <div className="flex justify-between items-center gap-2">
                           <span className="text-gray-200 font-semibold text-sm sm:text-base">Average Price</span>
                           <span className="text-lg sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 truncate">
-                            £{result.comicDetails.avg_price}
+                            £{result.comicDetails.avg_price || 'N/A'}
                           </span>
                         </div>
                       </div>
@@ -413,7 +413,7 @@ export default function ComicValuationApp() {
                         <div className="flex justify-between items-center gap-2">
                           <span className="text-gray-200 font-semibold text-sm sm:text-base">Database Avg</span>
                           <span className="text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 truncate">
-                            £{result.comicDetails.database_avg_price}
+                            £{result.comicDetails.database_avg_price || 'N/A'}
                           </span>
                         </div>
                         <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-blue-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
