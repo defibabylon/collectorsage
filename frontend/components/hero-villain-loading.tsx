@@ -1,5 +1,6 @@
 "use client"
 
+// Force fresh build - v2.0
 import React, { useEffect, useState } from "react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
@@ -9,7 +10,7 @@ interface HeroVillainLoadingProps {
   className?: string
 }
 
-export default function HeroVillainLoading({ progress, className }: HeroVillainLoadingProps) {
+function HeroVillainLoading({ progress, className }: HeroVillainLoadingProps) {
   const [showImpact, setShowImpact] = useState(false)
   const [showFinalClash, setShowFinalClash] = useState(false)
   const [showFinalImpact, setShowFinalImpact] = useState(false)
@@ -297,3 +298,5 @@ export default function HeroVillainLoading({ progress, className }: HeroVillainL
     </div>
   )
 }
+
+export default HeroVillainLoading
