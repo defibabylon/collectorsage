@@ -60,10 +60,9 @@ def fetch_ebay_data(query):
         params = {
             'q': query,
             'category_ids': '158671',
-            'filter': 'price:[10..],priceCurrency:GBP',
+            'filter': 'priceCurrency:GBP',
             'item_location_country': 'GB',
             'item_condition': '3000',
-            'buying_options': 'FIXED_PRICE',
             'sold_items_only': 'true'
         }
 
