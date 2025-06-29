@@ -23,16 +23,16 @@ import {
   Target,
   Clock,
   Database,
+  MessageSquare,
   Send,
   CheckCircle,
   AlertCircle,
-  MessageSquare,
 } from "lucide-react"
 import Image from "next/image"
 import axios from "axios"
 
-// API URL configuration
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
+// API URL configuration for local development
+const API_URL = 'http://127.0.0.1:8000'
 
 interface ComicDetails {
   title: string
@@ -235,7 +235,6 @@ export default function ComicValuationApp() {
         isSubmitting: false,
         isSubmitted: true
       }))
-
     } catch (error) {
       console.error('Error submitting feedback:', error)
       setFeedback(prev => ({
@@ -688,6 +687,7 @@ export default function ComicValuationApp() {
                           )}
                         </Button>
                       </div>
+                    </div>
                   ) : (
                     /* Success State */
                     <div className="text-center py-8">
