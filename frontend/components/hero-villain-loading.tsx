@@ -272,14 +272,7 @@ export default function HeroVillainLoading({ progress, className }: HeroVillainL
         </div>
       )}
 
-      {/* Energy crackling effects when characters are close */}
-      {progress > 70 && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-          <div className="w-2 h-16 bg-gradient-to-t from-blue-400 to-purple-400 opacity-60 animate-pulse transform rotate-12" />
-          <div className="absolute w-2 h-12 bg-gradient-to-t from-purple-400 to-red-400 opacity-40 animate-pulse transform -rotate-12 left-4" />
-          <div className="absolute w-1 h-8 bg-white opacity-80 animate-pulse transform rotate-45 left-2 top-2" />
-        </div>
-      )}
+
 
       {/* Loading text */}
       <div className="absolute top-2 sm:top-4 left-1/2 transform -translate-x-1/2">
